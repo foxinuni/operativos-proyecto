@@ -1,14 +1,5 @@
-/**
- * @file flags.h
- * @brief Common utility for passing command line arguments
- * @date 2024-11-05
- * 
- * The following file contains functions for parsing command line arguments.
- * That's pretty much it lmao.
- */
-
-#ifndef LSC_PACKET_H
-#define LSC_PACKET_H
+#ifndef SC_PACKET
+#define SC_PACKET
 #include <string.h>
 
 // The following structure represents a singular flag
