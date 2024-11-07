@@ -1,16 +1,16 @@
 CC = gcc
-CFLAGS = -Icommon
-SRC = source/main.c common/flags.c common/topics.c
-OBJ = main.o
-TARGET = program
+CFLAGS = -Wall -g
+LDFLAGS = -lm
+COMMON = src/commons.c src/flags.c
 
-all: $(TARGET)
+central: src/central.c $(COMMON)
+	$(CC) $(CFLAGS) -o central src/central.c $(COMMON) $(LDFLAGS) 
 
-$(TARGET): $(OBJ)
-	$(CC) -o $@ $^
+publisher: src/publisher.c $(COMMON)
+	$(CC) $(CFLAGS) -o publisher src/publisher.c $(COMMON) $(LDFLAGS)
 
-$(OBJ): $(SRC)
-	$(CC) $(CFLAGS) -c $< -o $@
+subscriber: src/subscriber.c $(COMMON)
+	$(CC) $(CFLAGS) -o subscriber src/subscriber.c $(COMMON) $(LDFLAGS)
 
 clean:
-	rm -f $(OBJ) $(TARGET)
+	rm -f central publisher subscriber

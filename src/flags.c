@@ -2,17 +2,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-flags_t* flag_parser_create() {
+flags_t* flags_create() {
     flags_t* parser = malloc(sizeof(flags_t));
     parser->count = 0;
     return parser;
 }
 
-void flag_parser_destroy(flags_t* parser) {
+void flags_destroy(flags_t* parser) {
     free(parser);
 }
 
-int flag_parser_parse(flags_t* parser, int argc, char* argv[]) {
+int flags_parse(flags_t* parser, int argc, char* argv[]) {
     for (int i = 1; i < argc - 1; i++) {
         for (int j = 0; j < parser->count; j++) {
             if (argv[i][0] == '-' && argv[i][1] != parser->flags[j].flag) {
@@ -33,13 +33,14 @@ int flag_parser_parse(flags_t* parser, int argc, char* argv[]) {
     return 0;
 }
 
-int flag_parser_int(flags_t* parser, void* value, char flag, int default_value) {
+int flags_int(flags_t* parser, void* value, char flag, int default_value) {
     if (parser->count >= 10) {
         return -1;
     }	
 
     parser->flags[parser->count].flag = flag;
     parser->flags[parser->count].type = FLAG_TYPE_INT;
+    parser->flags[parser->count].value = value;
     parser->count++;
 
     // Set the default value
@@ -48,13 +49,14 @@ int flag_parser_int(flags_t* parser, void* value, char flag, int default_value) 
     return 0;
 }
 
-int flag_parser_string(flags_t* parser, void* value, char flag, const char* default_value) {
+int flags_string(flags_t* parser, void* value, char flag, const char* default_value) {
     if (parser->count >= 10) {
         return -1;
     }
     
     parser->flags[parser->count].flag = flag;
     parser->flags[parser->count].type = FLAG_TYPE_STRING;
+    parser->flags[parser->count].value = value;
     parser->count++;
 
     // Set the default value
