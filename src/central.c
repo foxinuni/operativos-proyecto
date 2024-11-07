@@ -42,6 +42,8 @@ void* register_thread(void* args) {
     // Open the register pipe
     int fd = open(reg_pipe, O_RDONLY);
     if (fd == -1) {
+        perror("open");
+
         flog(LOG_ERROR, "Failed to open the register pipe!\n");
         shutting_down = true;
         return NULL;
@@ -49,6 +51,8 @@ void* register_thread(void* args) {
 
     // File descriptor is set to non-blocking
     if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
+        perror("fcntl");
+
         flog(LOG_ERROR, "Failed to set the register pipe to non-blocking!\n");
         shutting_down = true;
         return NULL;
@@ -61,6 +65,8 @@ void* register_thread(void* args) {
         int err;
 
         if ((err = read(fd, buffer, buffer_size)) == -1) {
+            perror("read");
+
             flog(LOG_ERROR, "Failed to read the action from the register pipe!\n");
             shutting_down = true;
             return NULL;
@@ -111,12 +117,16 @@ int main(int argc, char* argv[]) {
 
     // Register signals
     if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+        perror("signal");
+
         flog(LOG_ERROR, "Failed to register the SIGINT handler!\n");
         return 1;
     }
 
     // Create the semaphores
     if (pthread_create(&register_th, NULL, register_thread, NULL) != 0) {
+        perror("pthread_create");
+        
         flog(LOG_ERROR, "Failed to create the register thread!\n");
         return 1;
     }
