@@ -5,6 +5,7 @@ void start_publisher(int argc, char* argv[]) {
     char file[255];
     int timeN;
 
+    // this helps to read the arguments in the shell with the specific flags
     flags_t* parser = flags_create();
     flags_string(parser, pipePSC, 'p', "/tmp/pipePSC");
     flags_string(parser, file, 'f', "news.txt");
@@ -15,12 +16,14 @@ void start_publisher(int argc, char* argv[]) {
 
     flog(LOG_INFO, "Publisher initialized with pipe: %s, file: %s, time interval: %d seconds\n", pipePSC, file, timeN);
 
+    // file
     FILE* fp = fopen(file, "r");
     if (!fp) {
         flog(LOG_ERROR, "Failed to open the news file: %s\n", file);
         exit(EXIT_FAILURE);
     }
 
+    // pipe
     int fd = open(pipePSC, O_WRONLY);
     if (fd == -1) {
         perror("open");
@@ -35,6 +38,7 @@ void start_publisher(int argc, char* argv[]) {
             line[strlen(line) - 1] = '\0';
         }
 
+        // write the line content in the pipe
         if (write(fd, line, strlen(line)) == -1) {
             perror("write");
             flog(LOG_ERROR, "Failed to write to the pipe\n");
