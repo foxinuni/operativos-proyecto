@@ -14,24 +14,27 @@ void flags_destroy(flags_t* parser) {
 
 int flags_parse(flags_t* parser, int argc, char* argv[]) {
     for (int i = 1; i < argc - 1; i++) {
-        for (int j = 0; j < parser->count; j++) {
-            if (argv[i][0] == '-' && argv[i][1] != parser->flags[j].flag) {
-                continue;
-            }
-
-            switch (parser->flags[j].type) {
-                case FLAG_TYPE_INT:
-                    *((int*)parser->flags[j].value) = atoi(argv[i + 1]);
-                    break;
-                case FLAG_TYPE_STRING:
-                    strcpy((char*)parser->flags[j].value, argv[i + 1]);
-                    break;
+        if (argv[i][0] == '-') {  
+            char flag = argv[i][1];
+            for (int j = 0; j < parser->count; j++) {
+                if (parser->flags[j].flag == flag) {
+                    switch (parser->flags[j].type) {
+                        case FLAG_TYPE_INT:
+                            *((int*)parser->flags[j].value) = atoi(argv[i + 1]);
+                            break;
+                        case FLAG_TYPE_STRING:
+                            strcpy((char*)parser->flags[j].value, argv[i + 1]);
+                            break;
+                    }
+                    i++; // next flas-value
+                    break; // flag found
+                }
             }
         }
     }
-
     return 0;
 }
+
 
 int flags_int(flags_t* parser, void* value, char flag, int default_value) {
     if (parser->count >= 10) {

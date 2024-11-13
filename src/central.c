@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdlib.h> 
 
 #include "flags.h"
 #include "commons.h"
@@ -21,6 +22,7 @@ static char pub_pipe[255];
 void sigint_handler(int _) {
     flog(LOG_INFO, "Received SIGINT, shutting down!\n");
     shutting_down = true;
+    exit(0);
 }
 
 void parse_arguments(int argc, char* argv[]) {

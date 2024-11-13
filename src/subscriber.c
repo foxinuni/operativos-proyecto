@@ -2,17 +2,31 @@
 
 void start_subscriber(int argc, char* argv[]) {
     char pipeSSC[255];
+    char interests[10];
+    
+    printf("Seleccione los tipos de noticias que desea recibir ingresando las letras correspondientes.\n");
+    printf("Opciones disponibles:\n");
+    printf("  P - Política\n");
+    printf("  A - Arte\n");
+    printf("  C - Ciencia\n");
+    printf("  E - Farándula y Espectáculos\n");
+    printf("  S - Sucesos\n");
+    printf("Ingrese sus intereses (ejemplo: 'PACS' para Política, Arte, Ciencia y Sucesos): ");
 
-    // this helps to read the arguments, same than publishers
+    if (fgets(interests, sizeof(interests), stdin) == NULL) {
+        flog(LOG_ERROR, "Error al leer los intereses del usuario.\n");
+        exit(EXIT_FAILURE);
+    }
+    interests[strcspn(interests, "\n")] = '\0';
+
     flags_t* parser = flags_create();
-    flags_string(parser, pipeSSC, 's', "/tmp/pipeSSC");
+    flags_string(parser, pipeSSC, 's', "/tmp/sc_sub");
 
     flags_parse(parser, argc, argv);
     flags_destroy(parser);
 
     flog(LOG_INFO, "Subscriber initialized with pipe: %s\n", pipeSSC);
 
-    // pipe
     int fd = open(pipeSSC, O_RDONLY);
     if (fd == -1) {
         perror("open");
@@ -21,7 +35,6 @@ void start_subscriber(int argc, char* argv[]) {
     }
 
     char buffer[256];
-    // if the buffer is > 0 it took information, if is equal to 0 is the end of the file and if it´s equal to -1 is an error
     while (read(fd, buffer, sizeof(buffer)) > 0) {
         buffer[strcspn(buffer, "\n")] = '\0';
         flog(LOG_INFO, "Received news: %s\n", buffer);
