@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include "flags.h"
 #include "commons.h"
+#include <fcntl.h>
 
 // Function to initialize the publisher
 void start_publisher(int argc, char* argv[]);

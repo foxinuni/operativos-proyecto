@@ -52,3 +52,8 @@ void start_publisher(int argc, char* argv[]) {
     fclose(fp);
     flog(LOG_INFO, "Publisher finished\n");
 }
+
+int main(int argc, char* argv[]) {
+    start_publisher(argc, argv);
+    return 0;
+}

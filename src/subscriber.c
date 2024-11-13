@@ -30,3 +30,8 @@ void start_subscriber(int argc, char* argv[]) {
     close(fd);
     flog(LOG_INFO, "Subscriber finished\n");
 }
+
+int main(int argc, char* argv[]) {
+    start_subscriber(argc, argv);
+    return 0;
+}
