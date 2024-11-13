@@ -8,7 +8,7 @@ void start_publisher(int argc, char* argv[]) {
     // this helps to read the arguments in the shell with the specific flags
     flags_t* parser = flags_create();
     flags_string(parser, pipePSC, 'p', "/tmp/sc_pub");
-    flags_string(parser, file, 'f', "test/news1.txt");
+    flags_string(parser, file, 'f', "test/news2.txt");
     flags_int(parser, &timeN, 't', 1);
 
     flags_parse(parser, argc, argv);
