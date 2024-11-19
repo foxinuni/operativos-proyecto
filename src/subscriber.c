@@ -1,10 +1,122 @@
-#include "subscriber.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <signal.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
 
-void start_subscriber(int argc, char* argv[]) {
-    char pipeSSC[255];
-    char interests[10];
-    int pid = getpid();  
+#include "commons.h"
+#include "coms.h"
+#include "flags.h"
 
+#define DELAY_TIME 50000 // 50 ms (50000 us)
+
+enum subscriber_state {
+    STATE_INIT,
+    STATE_CONNECTED,
+    STATE_TERMINATED
+} state;
+
+sem_t awknowledged;
+
+// arguments
+char reg_pipe[255];
+char sub_pipe[255];
+
+// client settings
+char interests[10];
+int reg_fd, sub_fd;
+int pid;
+
+void signal_awknowledged() {
+    sem_post(&awknowledged);
+}
+
+void signal_terminate() {
+    flog(LOG_INFO, "Recieved terminate signal from central\n");
+    state = STATE_TERMINATED;
+    sem_post(&awknowledged);
+}
+
+void signal_shutdown() {
+    flog(LOG_INFO, "Recieved shutdown signal\n");
+    state = STATE_TERMINATED;
+    sem_post(&awknowledged);
+}
+
+int await_ack() {
+    sem_wait(&awknowledged);
+    return state == STATE_TERMINATED;
+}
+
+void* event_loop(void* _) {
+    flog(LOG_INFO, "Initiating the event loop...\n");
+
+    for (;;) {
+        switch (state) {
+        case STATE_INIT:
+            // register
+            sub_register(reg_fd, pid, interests);
+            if (await_ack() == 1) {
+                flog(LOG_ERROR, "Failed to register to server!");
+                continue;
+            }
+
+            flog(LOG_INFO, "Registered with interests %s\n", interests);
+            state = STATE_CONNECTED;
+            break;
+        case STATE_CONNECTED: {
+            char buffer[256];
+            int bytes_read = read(sub_fd, buffer, sizeof(buffer) - 1);
+            if (bytes_read == -1) {
+                if (errno == EAGAIN) {
+                    continue;
+                }
+
+                perror("read");
+                flog(LOG_ERROR, "Failed to read from the sub pipe!\n");
+                state = STATE_TERMINATED;
+                continue;
+            }
+
+            if (bytes_read > 0) {
+                buffer[bytes_read] = '\0';
+                flog(LOG_INFO, "Received message: %s\n", buffer);
+            }
+        }
+        break;
+        case STATE_TERMINATED:
+            flog(LOG_WARNING, "Process terminated- deregistering from the central.\n");
+            sub_unregister(reg_fd, pid);
+
+            return NULL; // exit
+        }
+
+        usleep(DELAY_TIME);
+    }
+}
+
+void parse_arguments(int argc, char* argv[]) {
+    static flags_t parser;
+
+    // Define the flags being used
+    flags_string(&parser, reg_pipe, 'c', "/tmp/sc_reg");
+
+    // Parse the arguments
+    flags_parse(&parser, argc, argv);
+}
+
+int main(int argc, char* argv[]) {
+    pthread_t event_loop_th;
+
+    // parse arguments
+    parse_arguments(argc, argv);
+
+    // select the interests
     printf("Seleccione los tipos de noticias que desea recibir ingresando las letras correspondientes.\n");
     printf("Opciones disponibles:\n");
     printf("  P - Política\n");
@@ -16,56 +128,83 @@ void start_subscriber(int argc, char* argv[]) {
 
     if (fgets(interests, sizeof(interests), stdin) == NULL) {
         flog(LOG_ERROR, "Error al leer los intereses del usuario.\n");
-        exit(EXIT_FAILURE);
+        return -1;
     }
+
     interests[strcspn(interests, "\n")] = '\0';
 
-    // this sends the interests to the server
-    for (int i = 0; i < strlen(interests); i++) {
-        char reg_msg[256];
-        snprintf(reg_msg, sizeof(reg_msg), "%d S R %c", pid, interests[i]);
-        int reg_fd = open("/tmp/sc_reg", O_WRONLY);
-        if (reg_fd == -1) {
-            perror("open");
-            flog(LOG_ERROR, "Failed to open the register pipe\n");
-            exit(EXIT_FAILURE);
-        }
-        if (write(reg_fd, reg_msg, strlen(reg_msg)) == -1) {
-            perror("write");
-            flog(LOG_ERROR, "Failed to write to the register pipe\n");
-            close(reg_fd);
-            exit(EXIT_FAILURE);
-        }        
-        close(reg_fd);
+    // get the pid
+    pid = getpid();
+
+    // set pipe name
+    snprintf(sub_pipe, sizeof(sub_pipe), "/tmp/sc_sub_%d", pid);
+
+    // init semaphore
+    if (sem_init(&awknowledged, 0, 0) == -1) {
+        perror("sem_init");
+        flog(LOG_ERROR, "Failed to initialize the semaphore!\n");
+        return -1;
     }
 
-    // flags
-    flags_t* parser = flags_create();
-    flags_string(parser, pipeSSC, 's', "/tmp/sc_sub");
-    flags_parse(parser, argc, argv);
-    flags_destroy(parser);
+    // register usr1 signal
+    if (signal(SIGUSR1, signal_awknowledged) == SIG_ERR) {
+        perror("signal");
+        flog(LOG_ERROR, "Failed to register the signal!\n");
+        return -1;
+    }
 
-    flog(LOG_INFO, "Subscriber initialized with pipe: %s\n", pipeSSC);
-    
-    // pipe
-    int fd = open(pipeSSC, O_RDONLY);
-    if (fd == -1) {
+    // register usr2 signal
+    if (signal(SIGUSR2, signal_terminate) == SIG_ERR) {
+        perror("signal");
+        flog(LOG_ERROR, "Failed to register the terminate signal!\n");
+        return -1;
+    }
+
+    // register the sigint sifnal
+    if (signal(SIGINT, signal_shutdown) == SIG_ERR) {
+        perror("signal");
+        flog(LOG_ERROR, "Failed to register the shutdown signal!\n");
+        return -1;
+    }
+
+    // create the pipe
+    if (mkfifo(sub_pipe, 0666) == -1) {
+        perror("mkfifo");
+        flog(LOG_ERROR, "Failed to create the sub pipe!\n");
+        return -1;
+    }
+
+    // open pipes
+    reg_fd = open(reg_pipe, O_WRONLY);
+    if (reg_fd == -1) {
         perror("open");
-        flog(LOG_ERROR, "Failed to open the pipe: %s\n", pipeSSC);
-        exit(EXIT_FAILURE);
+        flog(LOG_ERROR, "Failed to open the register pipe!\n");
+        return -1;
     }
 
-    char buffer[256];
-    while (read(fd, buffer, sizeof(buffer)) > 0) {
-        buffer[strcspn(buffer, "\n")] = '\0';
-        flog(LOG_INFO, "Received news: %s\n", buffer);
+    // open the pipe
+    sub_fd = open(sub_pipe, O_RDONLY | O_NONBLOCK);
+    if (sub_fd == -1) {
+        perror("open");
+        flog(LOG_ERROR, "Failed to open the sub pipe!\n");
+        return -1;
     }
 
-    close(fd);
-    flog(LOG_INFO, "Subscriber finished\n");
-}
+    // create threads
+    if (pthread_create(&event_loop_th, NULL, event_loop, NULL) != 0) {
+        perror("pthread_create");
+        flog(LOG_ERROR, "Failed to create the working thread!\n");
+        close(reg_fd);
+        return -1;
+    }
 
-int main(int argc, char* argv[]) {
-    start_subscriber(argc, argv);
+    // start the working thread
+    pthread_join(event_loop_th, NULL);
+
+    // close pipes
+    close(reg_fd);
+    close(sub_fd);
+    unlink(sub_pipe);
+
     return 0;
 }

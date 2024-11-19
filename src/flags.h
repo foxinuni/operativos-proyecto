@@ -1,5 +1,6 @@
-#ifndef SC_PACKET
-#define SC_PACKET
+#ifndef SC_FLAGS_H
+#define SC_FLAGS_H
+
 #include <string.h>
 
 // The following structure represents a singular flag
