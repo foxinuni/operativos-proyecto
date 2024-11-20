@@ -184,17 +184,19 @@ void deregister_and_kill_all() {
     // deregister all subscribers
     flog(LOG_INFO, "Deregistering all subscribers\n");
 
-    for (int i = 0; i < subscriber_count; i++) {
-        deregister_subscriber(subscriber_pids[i]);
-        kill(subscriber_pids[i], SIGUSR2);
+    while (subscriber_count > 0) {
+        int pid = subscriber_pids[subscriber_count - 1];
+        deregister_subscriber(pid);
+        kill(pid, SIGUSR2);
     }
 
     flog(LOG_INFO, "Deregistering all publishers\n");
     
     // deregister all publishers
-    for (int i = 0; i < publisher_count; i++) {
-        deregister_publisher(publisher_pids[i]);
-        kill(publisher_pids[i], SIGUSR2);
+    while (publisher_count > 0) {
+        int pid = publisher_pids[0];
+        deregister_publisher(pid);
+        kill(pid, SIGUSR2);
     }
 }
 
