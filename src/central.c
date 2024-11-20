@@ -30,10 +30,12 @@ static int subscriber_pids[MAX_SUBSCRIBERS];
 static int subscribers_fd[MAX_SUBSCRIBERS];
 static char subscriber_interests[MAX_SUBSCRIBERS][MAX_TOPICS];
 static int subscriber_count = 0;
+pthread_mutex_t subscriber_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // publishers
 static int publisher_pids[MAX_PUBLISHERS];
 static int publisher_count = 0;
+pthread_mutex_t publisher_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // pipes
 int reg_fd, pub_fd;
@@ -52,6 +54,9 @@ void parse_arguments(int argc, char* argv[]) {
 
 void register_subscriber(int pid, char* topics) {
     flog(LOG_INFO, "Registering subscriber %d with topics: %s\n", pid, topics);
+
+    // lock the subscriber's array
+    pthread_mutex_lock(&subscriber_mutex);
 
     // find the subscriber's PID
     for (int i = 0; i < subscriber_count; i++) {
@@ -92,10 +97,16 @@ void register_subscriber(int pid, char* topics) {
         flog(LOG_WARNING, "Maximum number of subscribers reached\n");
         kill(pid, SIGUSR2);
     }
+
+    // unlock the subscriber's array
+    pthread_mutex_unlock(&subscriber_mutex);
 }
 
 void register_publisher(int pid) {
     flog(LOG_INFO, "Registering publisher %d\n", pid);
+
+    // lock the publisher's array
+    pthread_mutex_lock(&publisher_mutex);
 
     // find the publisher's PID
     for (int i = 0; i < publisher_count; i++) {
@@ -116,10 +127,16 @@ void register_publisher(int pid) {
         flog(LOG_WARNING, "Maximum number of publishers reached\n");
         kill(pid, SIGUSR2);
     }
+
+    // unlock the publisher's array
+    pthread_mutex_unlock(&publisher_mutex);
 }
 
 void deregister_subscriber(int pid) {
     flog(LOG_INFO, "Deregistering subscriber %d\n", pid);
+
+    // lock the subscriber's array
+    pthread_mutex_lock(&subscriber_mutex);
 
     // find the subscriber's PID
     for (int i = 0; i < subscriber_count; i++) {
@@ -135,10 +152,16 @@ void deregister_subscriber(int pid) {
             break;
         }
     }
+
+    // unlock the subscriber's array
+    pthread_mutex_unlock(&subscriber_mutex);
 }
 
 void deregister_publisher(int pid) {
     flog(LOG_INFO, "Deregistering publisher %d\n", pid);
+
+    // lock the publisher's array
+    pthread_mutex_lock(&publisher_mutex);
 
     // find the publisher's PID
     for (int i = 0; i < publisher_count; i++) {
@@ -152,14 +175,22 @@ void deregister_publisher(int pid) {
 
     // aknowledge the deregistration
     kill(pid, SIGUSR1);
+
+    // unlock the publisher's array
+    pthread_mutex_unlock(&publisher_mutex);
 }
 
 void deregister_and_kill_all() {
+    // deregister all subscribers
+    flog(LOG_INFO, "Deregistering all subscribers\n");
+
     for (int i = 0; i < subscriber_count; i++) {
         deregister_subscriber(subscriber_pids[i]);
         kill(subscriber_pids[i], SIGUSR2);
     }
 
+    flog(LOG_INFO, "Deregistering all publishers\n");
+    
     // deregister all publishers
     for (int i = 0; i < publisher_count; i++) {
         deregister_publisher(publisher_pids[i]);
